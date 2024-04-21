@@ -65,3 +65,17 @@ class DynamicLayer(nn.Module):
             return norm_class(**class_kwargs)
         else:
             raise ValueError(f"Normalization class {class_name} not found in torch.nn")
+
+
+class ResidualBlock(DynamicLayer):
+    def __init__(
+        self,
+        dim_in,
+        dim_out,
+        norm=False,
+        activation=False,
+        dropout=False,
+        final_layer=False,
+        **kwargs,
+    ):
+        raise NotImplementedError
