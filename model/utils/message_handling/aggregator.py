@@ -1,7 +1,8 @@
-import torch
 from typing import Dict, List, Optional
 
-from models.utils.nn_building_blocks import FcOutModel
+import torch
+
+from model.utils.nn_building_blocks import FcOutModel
 
 
 class MessageAggregator(FcOutModel):

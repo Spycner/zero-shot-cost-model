@@ -1,6 +1,8 @@
-import dgl
 from typing import Dict, List, Optional
+
+import dgl
 import dgl.function as fn
+
 from aggregator import MessageAggregator
 
 
