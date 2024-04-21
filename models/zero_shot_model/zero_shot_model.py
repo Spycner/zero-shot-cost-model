@@ -3,8 +3,7 @@ import torch.nn as nn
 
 from models.zero_shot_model.utils.nn_building_blocks import FcOutModel
 from models.zero_shot_model.utils.node_encoder import NodeEncoder
-
-import message_aggregators
+from models.zero_shot_model import message_aggregators
 
 
 class ZeroShotModel(pl.LightningModule, FcOutModel):
@@ -48,7 +47,7 @@ class ZeroShotModel(pl.LightningModule, FcOutModel):
         ]
         self.tree_models = nn.ModuleDict(
             {
-                node_type: message_aggregators.__dict__[tree_layer_name](
+                node_type: message_aggregators.aggregator_classes[tree_layer_name](
                     hidden_dim=self.hidden_dim, **tree_layer_kwargs
                 )
                 for node_type in tree_model_types
