@@ -1,7 +1,7 @@
 import dgl
 from typing import Dict, List, Optional
 import dgl.function as fn
-from models.zero_shot_model.message_aggregators.aggregator import MessageAggregator
+from aggregator import MessageAggregator
 
 
 class MscnConv(MessageAggregator):
