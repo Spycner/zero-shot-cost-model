@@ -5,8 +5,9 @@ import torch
 import torch.nn as nn
 
 from model.utils.nn_building_blocks import FcOutModel
-from model.utils.node_building.node_encoder import NodeEncoder
+from model.utils.embedder.node_encoder import NodeEncoder
 from model.utils.message_handling import PassDirection, aggregator_classes
+from model.utils.metrics import MAPE, RMSE, QError
 
 
 class ZeroShotModel(pl.LightningModule, FcOutModel):
@@ -27,6 +28,10 @@ class ZeroShotModel(pl.LightningModule, FcOutModel):
         plan_featurization: Optional[Dict] = None,
         encoders: Optional[List[Tuple[str, Dict]]] = None,
         label_norm: Optional[Dict] = None,
+        optimizer_class_name: str = "Adam",
+        optimizer_kwargs: Optional[Dict] = None,
+        loss_func: Optional[torch.nn.Module] = None,  # Added loss_func parameter
+        evaluation_metrics: Optional[List[str]] = None,
     ):
         """
         Initializes the ZeroShotModel, a PyTorch Lightning module for zero-shot learning.
@@ -47,6 +52,9 @@ class ZeroShotModel(pl.LightningModule, FcOutModel):
             plan_featurization (Optional[Dict]): Configuration for plan featurization.
             encoders (Optional[List[Tuple[str, Dict]]]): Encoders for different node types.
             label_norm (Optional[Dict]): Configuration for label normalization.
+            optimizer_class_name (str): The class name of the optimizer to use.
+            optimizer_kwargs (Optional[Dict]): Additional keyword arguments for the optimizer.
+            loss_func (Optional[torch.nn.Module]): The loss function to use.  # Added loss_func description
         """
         super().__init__(
             output_dim=output_dim,
@@ -61,6 +69,17 @@ class ZeroShotModel(pl.LightningModule, FcOutModel):
         self.skip_message_passing = skip_message_passing
         self.device = device
         self.hidden_dim = hidden_dim
+        self.optimizer_class_name = optimizer_class_name
+        self.optimizer_kwargs = optimizer_kwargs if optimizer_kwargs is not None else {}
+        self.loss_func = loss_func  # Initialized loss_func
+        self.evaluation_metrics = (
+            evaluation_metrics if evaluation_metrics is not None else []
+        )
+        self.metrics = {
+            "mape": MAPE(),
+            "rmse": RMSE(),
+            "qerror": QError(),
+        }
 
         # Initialize models for different tree edge types
         tree_model_types = add_tree_model_types + [
@@ -199,3 +218,47 @@ class ZeroShotModel(pl.LightningModule, FcOutModel):
             out = self.fcout(out)
 
         return out
+
+    def training_step(self, batch, batch_idx):
+        input_model, label, sample_idxs = batch
+
+        output = self(input_model)
+        loss = self.loss_func(output, label)  # Use the initialized loss_func
+
+        if torch.isnan(loss):
+            raise ValueError("Loss is NaN")
+
+        self.log("train_loss", loss)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = getattr(torch.optim, self.optimizer_class_name)(
+            self.parameters(), **self.optimizer_kwargs
+        )
+        return optimizer
+
+    def validation_step(self, batch, batch_idx):
+        input_model, label, sample_idxs = batch
+        output = self(input_model)
+        loss = self.loss_func(output, label)  # Use the initialized loss_func
+        self.log("val_loss", loss)
+
+        labels_np = label.detach().cpu().numpy()
+        outputs_np = output.detach().cpu().numpy()
+
+        for metric_name in self.evaluation_metrics:
+            metric_func = self.metrics.get(metric_name)
+            if metric_func:
+                metric_value = metric_func.evaluate_metric(labels_np, outputs_np)
+                self.log(
+                    f"val_{metric_name}",
+                    metric_value,
+                    on_step=False,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                )
+            else:
+                print(f"Warning: Metric '{metric_name}' not found in registry.")
+
+        return loss

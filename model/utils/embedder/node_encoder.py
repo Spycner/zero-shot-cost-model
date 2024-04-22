@@ -4,7 +4,7 @@ from torch import nn
 
 from nn_building_blocks import FcOutModel
 
-from feature_statistics import FeatureType
+from data.utils.enums import FeatureType
 
 
 class EmbeddingInitializer(nn.Module):
